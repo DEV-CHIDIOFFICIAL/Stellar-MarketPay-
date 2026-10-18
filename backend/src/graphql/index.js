@@ -8,17 +8,60 @@ const { createServiceLogger } = require("../utils/logger");
 const logger = createServiceLogger("graphql");
 
 const isDev = process.env.NODE_ENV !== "production";
+const MAX_QUERY_DEPTH = 8;
+const MAX_QUERY_COMPLEXITY = 100;
 
 function introspectionRule(context) {
   return {
     Field(node) {
       if (node.name.value === "__schema" || node.name.value === "__type") {
         context.reportError(
-          new Error("Introspection is disabled in production"),
+          new GraphQLError("Introspection is disabled in production", { nodes: node }),
         );
       }
     },
   };
+}
+
+function queryLimitsExceeded(document) {
+  const fragments = new Map(
+    document.definitions
+      .filter((definition) => definition.kind === "FragmentDefinition")
+      .map((fragment) => [fragment.name.value, fragment]),
+  );
+  const operations = document.definitions.filter(
+    (definition) => definition.kind === "OperationDefinition",
+  );
+
+  return operations.some((operation) => {
+    let complexity = 0;
+    let depth = 0;
+
+    function measure(selectionSet, parentDepth, activeFragments = new Set()) {
+      for (const selection of selectionSet.selections) {
+        if (selection.kind === "Field") {
+          complexity += 1;
+          const fieldDepth = parentDepth + 1;
+          depth = Math.max(depth, fieldDepth);
+          if (selection.selectionSet) {
+            measure(selection.selectionSet, fieldDepth, activeFragments);
+          }
+        } else if (selection.kind === "InlineFragment") {
+          measure(selection.selectionSet, parentDepth, activeFragments);
+        } else if (selection.kind === "FragmentSpread") {
+          const fragment = fragments.get(selection.name.value);
+          if (fragment && !activeFragments.has(fragment.name.value)) {
+            const nextActiveFragments = new Set(activeFragments);
+            nextActiveFragments.add(fragment.name.value);
+            measure(fragment.selectionSet, parentDepth, nextActiveFragments);
+          }
+        }
+      }
+    }
+
+    measure(operation.selectionSet, 0);
+    return depth > MAX_QUERY_DEPTH || complexity > MAX_QUERY_COMPLEXITY;
+  });
 }
 
 function handleGraphQL(req, res) {
@@ -67,8 +110,17 @@ function handleGraphQL(req, res) {
     return;
   }
 
+  if (queryLimitsExceeded(document)) {
+    res.status(400).json({
+      errors: [{
+        message: `Query exceeds the maximum depth (${MAX_QUERY_DEPTH}) or complexity (${MAX_QUERY_COMPLEXITY})`,
+      }],
+    });
+    return;
+  }
+
   const loaders = createLoaders();
-  const context = { loaders, req };
+  const context = { loaders, req, user: req.user };
 
   Promise.resolve()
     .then(() =>

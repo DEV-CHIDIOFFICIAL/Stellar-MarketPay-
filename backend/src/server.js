@@ -56,6 +56,8 @@ const anchorRoutes        = require("./routes/anchors");
 const scopeRoutes        = require("./routes/scope");
 const analyticsRoutes    = require("./routes/analytics");
 const searchRoutes       = require("./routes/search");
+const handleGraphQL = require("./graphql");
+const { verifyJWT } = require("./middleware/auth");
  
 const { setWebsocketConnections } = require("./metrics");
 const { startEscrowTimeoutChecker } = require("./services/escrowService");
@@ -188,6 +190,7 @@ app.use(rateLimit({ windowMs: 15 * 60 * 1000, max: 150, standardHeaders: true, l
 // ─── Routes ───────────────────────────────────────────────────────────────────
 app.use("/health",            healthRoutes);
 app.use("/api/auth",          authRoutes);
+app.post("/api/graphql",      verifyJWT, handleGraphQL);
 app.use("/api/jobs",          jobRoutes);
 app.use("/api/applications",  applicationRoutes);
 app.use("/api/profiles",      profileRoutes);

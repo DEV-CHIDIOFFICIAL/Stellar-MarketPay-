@@ -507,7 +507,22 @@ Requires `x-api-key` developer key unless noted.
 
 | Method | Endpoint | Description |
 |--------|----------|-------------|
-| POST | `/api/graphql` | GraphQL endpoint (queries/mutations over the same domain models) |
+| POST | `/api/graphql` | Authenticated GraphQL queries and mutations; maximum depth 8 and complexity 100 |
+
+Send a JSON body containing `query` and optional `variables`. Authentication is
+required with a bearer JWT or the `token` cookie. The endpoint uses the existing
+job, profile, application, and escrow resolvers and disables introspection in
+production. Mutations that act for a wallet require its address to match the
+authenticated JWT's `publicKey`.
+
+Example: list recent open jobs and their client names:
+
+```bash
+curl http://localhost:4000/api/graphql \
+  -H "Authorization: Bearer $JWT" \
+  -H "Content-Type: application/json" \
+  --data '{"query":"query { jobs(filter: { status: \"open\", limit: 10 }) { jobs { id title budget client { publicKey displayName } } nextCursor } }"}'
+```
 
 ---
 

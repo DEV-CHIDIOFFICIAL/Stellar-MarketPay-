@@ -270,7 +270,10 @@ const MutationType = new GraphQLObjectType({
       args: {
         input: { type: new GraphQLNonNull(CreateJobInput) },
       },
-      resolve: async (_, { input }) => {
+      resolve: async (_, { input }, ctx) => {
+        if (input.clientAddress !== ctx.user.publicKey) {
+          throw Object.assign(new Error("Authenticated user must own the client address"), { status: 403 });
+        }
         return _createJob(input);
       },
     },
@@ -279,7 +282,10 @@ const MutationType = new GraphQLObjectType({
       args: {
         input: { type: new GraphQLNonNull(ApplyToJobInput) },
       },
-      resolve: async (_, { input }) => {
+      resolve: async (_, { input }, ctx) => {
+        if (input.freelancerAddress !== ctx.user.publicKey) {
+          throw Object.assign(new Error("Authenticated user must own the freelancer address"), { status: 403 });
+        }
         const app = await submitApplication({
           jobId: input.jobId,
           freelancerAddress: input.freelancerAddress,
@@ -297,7 +303,10 @@ const MutationType = new GraphQLObjectType({
         clientAddress: { type: new GraphQLNonNull(GraphQLString) },
         contractTxHash: { type: GraphQLString },
       },
-      resolve: async (_, { jobId, clientAddress, contractTxHash }) => {
+      resolve: async (_, { jobId, clientAddress, contractTxHash }, ctx) => {
+        if (clientAddress !== ctx.user.publicKey) {
+          throw Object.assign(new Error("Authenticated user must own the client address"), { status: 403 });
+        }
         const job = await _getJob(jobId);
 
         if (job.clientAddress !== clientAddress) {
