@@ -141,6 +141,18 @@ const notificationQueuePending = createMetric(promClient.Gauge, {
   help: "Pending notifications in the queue",
 });
 
+const queueEnqueueFailuresTotal = createMetric(promClient.Counter, {
+  name: "bull_queue_enqueue_failures_total",
+  help: "Total Bull queue enqueue failures",
+  labelNames: ["queue"],
+});
+
+const queueRedisConnected = createMetric(promClient.Gauge, {
+  name: "bull_queue_redis_connected",
+  help: "Whether a Bull queue is connected to Redis",
+  labelNames: ["queue"],
+});
+
 // ─── XLM price gauge ──────────────────────────────────────────────────────────
 /** Current XLM/USD spot price, updated on every successful CoinGecko fetch. */
 const xlmPriceUsd = createMetric(promClient.Gauge, {
@@ -403,6 +415,8 @@ module.exports = {
   pgPoolWaiting,
   pgPoolWaitingConnections,
   notificationQueuePending,
+  queueEnqueueFailuresTotal,
+  queueRedisConnected,
   xlmPriceUsd,
   ipfsPinVerificationFailuresTotal,
   xlmPriceFetchErrorsTotal,
